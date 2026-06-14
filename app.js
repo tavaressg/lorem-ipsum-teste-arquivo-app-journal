@@ -621,7 +621,7 @@ function alunoInicio(){
     <div class="kh-divider"></div>
     <div class="profile-photo" style="width:${sz}px;height:${sz}px;margin-top:${-Math.round(sz/2)}px;font-size:${Math.round(sz*0.34)}px">
       <span class="pp-ini">${me.iniciais}</span>
-      <img src="${me.foto||'perfil.jpg'}" onerror="this.remove()" alt="">
+      <img src="${me.foto||''}" onerror="this.remove()" alt="">
     </div>
     <div class="profile-name">${me.nomeCompleto && me.nomeCompleto!==me.apelido ? me.nomeCompleto+' | ' : ''}${me.apelido}</div>
   </div>`);
@@ -1305,8 +1305,7 @@ function alunoMeuJogo(){
 
   const subs = [['renshu','Renshū'],['progresso','Progresso'],['biblioteca','Biblioteca'],['analise','Análise']];
   const seg = el(`<div class="subtabs-scroll"></div>`);
-  // compat: abas antigas (visao/tecnicas/sistemas) → renshu/biblioteca
-  let tab = DB.jogoTab; if (tab==='visao') tab='renshu'; if (tab==='tecnicas'||tab==='sistemas') tab='biblioteca';
+  let tab = DB.jogoTab;
   subs.forEach(([id,l])=>{
     const b = el(`<button class="subtab2 ${tab===id?'on':''}">${l}</button>`);
     b.onclick = ()=>{ DB.jogoTab=id; render(); };
@@ -1320,35 +1319,6 @@ function alunoMeuJogo(){
   if (tab==='biblioteca') cont.appendChild(evoluirBiblioteca());
   if (tab==='analise')    cont.appendChild(evoluirAnalise());
   w.appendChild(cont);
-  return w;
-}
-
-/* ---- Sub-aba: SISTEMAS DE JOGO (técnicas conectadas) ---- */
-function evoluirSistemas(){
-  const w = el('<div></div>');
-  w.appendChild(el(`<div class="sec-row" style="margin-top:6px"><div class="sec-title">Seus sistemas</div>
-    <span style="font-size:12px;color:var(--muted);font-weight:700">do controle à finalização</span></div>`));
-  DB.sistemas.forEach((s,si)=>{
-    const card = el(`<div class="sys-card" style="--sc:${s.cor}">
-      <div class="sys-head"><span class="sys-emoji">${s.emoji}</span>
-        <div class="sys-tx"><div class="sn">${s.nome}</div><div class="sd">${s.desc}</div></div></div>
-      <div class="sys-flow"></div>
-    </div>`);
-    const flow = card.querySelector('.sys-flow');
-    s.passos.forEach((p,pi)=>{
-      const idx = DB.tecnicas.findIndex(t=>t.jp===p.t);
-      const step = el(`<div class="sys-step">
-        <div class="ss-tec">${p.t}</div><div class="ss-d">${p.d}</div></div>`);
-      if (idx>=0) step.onclick = ()=> abrirTecnica(idx);
-      flow.appendChild(step);
-      if (pi < s.passos.length-1) flow.appendChild(el(`<div class="sys-arrow">→</div>`));
-    });
-    w.appendChild(card);
-  });
-  const addBtn = el(`<button class="add-tec-btn">＋ Novo sistema</button>`);
-  addBtn.onclick = ()=> abrirMontarSistema();
-  w.appendChild(addBtn);
-  w.appendChild(el(`<div style="height:18px"></div>`));
   return w;
 }
 
@@ -1650,26 +1620,6 @@ function bibCardNode(t, st){
   return card;
 }
 
-// radar hexagonal em SVG
-function radarSVG(data){
-  const axes = Object.keys(data), n = axes.length;
-  const cx=130, cy=125, R=80;
-  const pt = (i,r)=>{ const a=-Math.PI/2 + i*2*Math.PI/n; return [cx+Math.cos(a)*r, cy+Math.sin(a)*r]; };
-  let rings='';
-  [0.25,0.5,0.75,1].forEach(fr=>{ rings += `<polygon points="${axes.map((_,i)=>pt(i,R*fr).join(',')).join(' ')}" fill="none" stroke="var(--line)" stroke-width="1"/>`; });
-  let spokes='', labels='';
-  axes.forEach((ax,i)=>{
-    const [x,y]=pt(i,R);
-    spokes += `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="var(--line)" stroke-width="1"/>`;
-    const [lx,ly]=pt(i,R+17);
-    const anchor = Math.abs(lx-cx)<6?'middle':(lx>cx?'start':'end');
-    labels += `<text x="${lx}" y="${ly}" font-size="9.5" font-weight="700" fill="var(--muted)" text-anchor="${anchor}" dominant-baseline="middle">${ax}</text>`;
-  });
-  const dpts = axes.map((ax,i)=>pt(i,R*data[ax]/100).join(',')).join(' ');
-  const dots = axes.map((ax,i)=>{ const [x,y]=pt(i,R*data[ax]/100); return `<circle cx="${x}" cy="${y}" r="3" fill="var(--red)"/>`; }).join('');
-  return `<svg viewBox="0 0 260 250" class="radar">${rings}${spokes}<polygon points="${dpts}" fill="rgba(239,83,80,.18)" stroke="var(--red)" stroke-width="2"/>${dots}${labels}</svg>`;
-}
-
 /* ---- Sub-aba: GRADUAÇÃO ---- */
 function evoluirGraduacao(){
   const w = el('<div></div>');
@@ -1753,24 +1703,6 @@ const CATS = {
 };
 const CAT_ORDER = ['nage','osaekomi','shime','kansetsu','kosen'];
 
-/* ---- FASES DO JOGO (a escada da arte única: do em pé à finalização) ----
-   O espinhaço da análise. Cada técnica pertence a uma fase; marcar a técnica
-   no rolê já credita a fase, sem toque extra. Mapa do jogo = atividade por fase. */
-const FASES = {
-  empe:        { nome:'Em pé',       emoji:'🥋', desc:'Queda · pegada · equilíbrio', chao:false },
-  guarda:      { nome:'Guarda',      emoji:'🛡️', desc:'Jogo por baixo · raspagem',   chao:true  },
-  passagem:    { nome:'Passagem',    emoji:'⚔️', desc:'Passar a guarda · por cima',  chao:true  },
-  dominacao:   { nome:'Dominação',   emoji:'👑', desc:'Montada · costas · 100kg',    chao:true  },
-  finalizacao: { nome:'Finalização', emoji:'🔒', desc:'Estrangulamento · chave',      chao:true  },
-};
-const FASE_ORDER = ['empe','guarda','passagem','dominacao','finalizacao'];
-// Mapa padrão categoria→fase (a fase pode ser sobrescrita por técnica via t.fase)
-const FASE_FROM_CAT = { nage:'empe', osaekomi:'dominacao', shime:'finalizacao', kansetsu:'finalizacao', kosen:'guarda' };
-// Sobrescritas pontuais (técnicas cuja fase real difere do default da categoria)
-const FASE_OVERRIDE = { 'Tate-sankaku':'dominacao', 'Obi-tori-gaeshi':'passagem', 'Hikikomi-gaeshi':'guarda', 'Tawara-gaeshi':'guarda' };
-function faseDe(t){ if(!t) return 'guarda'; const jp = typeof t==='string'?t:t.jp; const obj = typeof t==='string'?DB.tecnicas.find(x=>x.jp===t):t;
-  return (obj&&obj.fase) || FASE_OVERRIDE[jp] || (obj&&FASE_FROM_CAT[obj.cat]) || 'guarda'; }
-
 // ---- Revisão espaçada ("Anki do BJJ") ----
 const REV_INTERVALO = { aprendendo:3, treinando:7, dominada:21 }; // dias até cobrar revisão
 function diasEntre(iso){
@@ -1789,70 +1721,6 @@ function tecnicasParaRevisar(){
   return DB.tecnicas.map((t,i)=>({t,i,...revInfo(t)})).filter(x=>x.due && (x.t.treinos||0)>0).sort((a,b)=>b.atraso-a.atraso);
 }
 
-function evoluirTecnicas(){
-  const w = el('<div></div>');
-  const cont = { aprendendo:0, treinando:0, dominada:0 };
-  DB.tecnicas.forEach(t=>{ const nv=nivelDe(t); if(cont[nv]!=null) cont[nv]++; });
-  w.appendChild(el(`<div class="kpis block" style="margin-top:6px">
-    <div class="kpi"><div class="v gold">${cont.aprendendo}</div><div class="l">Aprendendo</div></div>
-    <div class="kpi"><div class="v blue">${cont.treinando}</div><div class="l">Treinando</div></div>
-    <div class="kpi"><div class="v green">${cont.dominada}</div><div class="l">Dominadas</div></div>
-  </div>`));
-
-  // 🔁 Revisão espaçada — técnicas que estão te cobrando
-  const due = tecnicasParaRevisar();
-  if (due.length){
-    w.appendChild(el(`<div class="sec-row"><div class="sec-title">🔁 Revisar · ${due.length}</div>
-      <span style="font-size:12px;color:var(--muted);font-weight:700">faz tempo que não treina</span></div>`));
-    const rl = el(`<div class="tec-list"></div>`);
-    due.slice(0,4).forEach(({t,i,dias})=>{
-      const row = el(`<div class="tec-row rev-row">
-        <div class="tec-ic rev-ic">🔁</div>
-        <div class="tec-tx"><div class="tn">${t.jp}</div>
-          <div class="ts">${t.pt} · faz ${dias} dias</div></div>
-        <button class="rev-ok" title="Revisei">✓</button></div>`);
-      row.querySelector('.rev-ok').onclick = (e)=>{ e.stopPropagation(); marcarRevisado(i); };
-      row.onclick = ()=> abrirTecnica(i);
-      rl.appendChild(row);
-    });
-    w.appendChild(rl);
-  }
-
-  // botão adicionar
-  const addBtn = el(`<button class="add-tec-btn">＋ Adicionar técnica</button>`);
-  addBtn.onclick = ()=> abrirEditorTecnica(null);
-  w.appendChild(addBtn);
-
-  // agrupado por categoria (nomenclatura japonesa, do em pé ao chão)
-  CAT_ORDER.forEach(catKey=>{
-    const itens = DB.tecnicas.map((t,i)=>({t,i})).filter(x=>x.t.cat===catKey);
-    if (!itens.length) return;
-    const c = CATS[catKey];
-    const tag = catKey==='kosen'
-      ? `<span class="cat-tag kosen">não-oficial</span>`
-      : `<span class="cat-tag oficial">Kodokan</span>`;
-    w.appendChild(el(`<div class="cat-head">
-      <div class="cat-emoji">${c.emoji}</div>
-      <div class="cat-tx"><div class="cn">${c.nome}</div><div class="cs">${c.sub}</div></div>
-      ${tag}
-    </div>`));
-    const list = el(`<div class="tec-list"></div>`);
-    itens.forEach(({t,i})=>{
-      const [nl,cor] = NIVEIS[nivelDe(t)];
-      const r = revInfo(t);
-      const row = el(`<div class="tec-row">
-        <div class="tec-ic">🥋</div>
-        <div class="tec-tx"><div class="tn">${t.jp}${r.due?' <span class="rev-dot" title="revisar"></span>':''}</div>
-          <div class="ts">${t.pt} · ${plural(t.treinos||0,'treino','treinos')}</div></div>
-        <span class="niv-badge ${cor}">${nl}</span></div>`);
-      row.onclick = ()=> abrirTecnica(i);
-      list.appendChild(row);
-    });
-    w.appendChild(list);
-  });
-  w.appendChild(el(`<div style="height:18px"></div>`));
-  return w;
-}
 function marcarRevisado(i){
   DB.tecnicas[i].ultimaRev = HOJE_ISO;
   track('revisao', { jp:DB.tecnicas[i].jp });
@@ -2019,35 +1887,6 @@ function tabbarAluno(){
   return bar;
 }
 
-// Hub de captura rápida (o "+" central)
-function abrirHubRegistro(){
-  const sheet = el(`<div class="sheet-overlay"><div class="sheet">
-    <div class="sheet-grip"></div>
-    <div class="sheet-title">O que você quer registrar?</div>
-    <div class="sheet-opt" data-a="treino">
-      <div class="so-ic" style="background:var(--red-tint)">🥋</div>
-      <div class="so-tx"><div class="t">Treino</div><div class="d">Aula técnica ou treino livre</div></div>
-      <div class="so-go">›</div></div>
-    <div class="sheet-opt" data-a="nota">
-      <div class="so-ic" style="background:var(--gold-tint)">📝</div>
-      <div class="so-tx"><div class="t">Nota rápida</div><div class="d">Um insight solto, sem formulário</div></div>
-      <div class="so-go">›</div></div>
-    <button class="sheet-cancel">Cancelar</button>
-  </div></div>`);
-  const close = ()=>{ sheet.classList.remove('open'); setTimeout(()=>sheet.remove(),260); };
-  sheet.onclick = (e)=>{ if(e.target===sheet) close(); };
-  sheet.querySelector('.sheet-cancel').onclick = close;
-  sheet.querySelectorAll('.sheet-opt').forEach(o=> o.onclick = ()=>{
-    sheet.remove();
-    const a = o.dataset.a;
-    if (a==='treino') openFlow(aulaDoDia().tipo);
-    else if (a==='nota') abrirNotaRapida();
-    else if (a==='tecnica') abrirEditorTecnica(null);
-  });
-  document.body.appendChild(sheet);
-  requestAnimationFrame(()=> sheet.classList.add('open'));
-}
-
 // Nota rápida — insight solto, sem formulário
 function abrirNotaRapida(){
   const sheet = el(`<div class="sheet-overlay"><div class="sheet">
@@ -2142,7 +1981,6 @@ function renderPresenca(){
   body.appendChild(kp);
 
   // geofence (futuro)
-  body.appendChild(el(`<div class="geo-hint">📍 Em breve: validação automática por localização (geofence)</div>`));
 
   v.appendChild(body);
 
@@ -2640,7 +2478,7 @@ function salvarTecnica(){
   const nome = $('#tec-nome').value.trim();
   if(!nome){ toast('Dê um nome à técnica'); return; }
   const sel = $('#posic .posic.on');
-  DB.tecnicaDoDia = { definida:true, data:'2026-06-03', nome,
+  DB.tecnicaDoDia = { definida:true, data:HOJE_ISO, nome,
     posicao: sel?sel.dataset.nm:'Geral', posicaoEmoji: sel?sel.dataset.em:'🥋',
     obs: $('#tec-obs').value.trim() || 'Sem observações.' };
   toast('Técnica publicada — já visível para os alunos ✔');
