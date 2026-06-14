@@ -1,0 +1,19 @@
+# ====== Yama · arquivos que NÃO vão pro GitHub (público) ======
+# Config local do Claude / dev
+.claude/
+
+# Scripts e rascunhos de desenvolvimento (não fazem parte do app publicado)
+build_offline.py
+rascunho-foco.html
+yama-offline.html
+logo-original.png
+
+# Lixo de sistema operacional
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log
+
+# Editores
+.vscode/
+.idea/
